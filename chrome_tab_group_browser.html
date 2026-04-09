@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chrome Tab Group Browser</title>
+<style>
+  :root {
+    --bg: #f5f5f5; --surface: #fff; --surface2: #fafafa; --border: #e0e0e0;
+    --text: #1a1a1a; --text2: #555; --text3: #888;
+    --accent: #1a73e8; --accent-hover: #1557b0;
+    --selected-bg: #e8f0fe;
+    --group-grey: #5f6368; --group-blue: #1a73e8; --group-red: #d93025;
+    --group-yellow: #f9ab00; --group-green: #1e8e3e; --group-pink: #d01884;
+    --group-purple: #9334e6; --group-cyan: #007b83; --group-orange: #e8710a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a; --surface: #242424; --surface2: #2a2a2a; --border: #404040;
+      --text: #e8e8e8; --text2: #aaa; --text3: #777;
+      --accent: #8ab4f8; --accent-hover: #aecbfa;
+      --selected-bg: #2d3748;
+      --group-grey: #9aa0a6; --group-blue: #8ab4f8; --group-red: #f28b82;
+      --group-yellow: #fdd663; --group-green: #81c995; --group-pink: #ff8bcb;
+      --group-purple: #c58af9; --group-cyan: #78d9ec; --group-orange: #fcad70;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 18px; font-weight: 600; white-space: nowrap; }
+  header .spacer { flex: 1; }
+  .search-box {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 12px; width: 280px;
+  }
+  .search-box input {
+    border: none; background: transparent; outline: none; width: 100%;
+    font-size: 14px; color: var(--text);
+  }
+  .search-box svg { flex-shrink: 0; opacity: 0.5; }
+
+  /* Toolbar */
+  .toolbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0; font-size: 13px;
+  }
+  .toolbar .stat { color: var(--text2); }
+  .toolbar .stat strong { color: var(--text); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 6px; font-size: 13px;
+    font-weight: 500; cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--bg); }
+  .btn.primary {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn svg { width: 14px; height: 14px; }
+
+  /* Main layout */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* Left panel: groups */
+  .panel-left {
+    flex: 1; overflow-y: auto; padding: 12px; min-width: 0;
+  }
+
+  /* Right panel: export */
+  .panel-right {
+    width: 380px; flex-shrink: 0; border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; background: var(--surface);
+  }
+  .panel-right-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .panel-right-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
+  .export-area {
+    flex: 1; overflow-y: auto; padding: 12px;
+  }
+  .export-area pre {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: var(--text2); white-space: pre-wrap; word-break: break-all;
+    line-height: 1.7;
+  }
+  .export-actions {
+    padding: 12px 16px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+
+  /* Profile section */
+  .profile-section { margin-bottom: 16px; }
+  .profile-header {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    background: var(--surface); border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); user-select: none;
+  }
+  .profile-header:hover { background: var(--surface2); }
+  .profile-header .arrow {
+    width: 16px; height: 16px; transition: transform 0.2s;
+    color: var(--text3); flex-shrink: 0;
+  }
+  .profile-header .arrow.collapsed { transform: rotate(-90deg); }
+  .profile-header .name { font-weight: 600; font-size: 14px; }
+  .profile-header .email { color: var(--text2); font-size: 12px; }
+  .profile-header .count {
+    margin-left: auto; font-size: 12px; color: var(--text3);
+    background: var(--bg); padding: 2px 8px; border-radius: 10px;
+  }
+  .profile-body { padding: 4px 0 4px 12px; }
+  .profile-body.hidden { display: none; }
+
+  /* Group card */
+  .group-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin: 6px 0; overflow: hidden;
+  }
+  .group-header {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    cursor: pointer; user-select: none;
+  }
+  .group-header:hover { background: var(--surface2); }
+  .group-header input[type="checkbox"] {
+    width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent);
+  }
+  .group-color-badge {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .group-header .title { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; }
+  .group-header .meta {
+    font-size: 11px; color: var(--text3); display: flex; gap: 8px;
+    flex-shrink: 0;
+  }
+  .group-header .arrow {
+    width: 14px; height: 14px; transition: transform 0.2s;
+    color: var(--text3); flex-shrink: 0;
+  }
+  .group-header .arrow.collapsed { transform: rotate(-90deg); }
+  .group-tabs { padding: 0 12px 8px 40px; }
+  .group-tabs.hidden { display: none; }
+
+  /* Tab row */
+  .tab-row {
+    display: flex; align-items: flex-start; gap: 8px; padding: 4px 0;
+    border-bottom: 1px solid var(--border); font-size: 13px;
+  }
+  .tab-row:last-child { border-bottom: none; }
+  .tab-row.selected { background: var(--selected-bg); margin: 0 -8px; padding: 4px 8px; border-radius: 4px; }
+  .tab-row input[type="checkbox"] {
+    width: 15px; height: 15px; cursor: pointer; margin-top: 2px;
+    flex-shrink: 0; accent-color: var(--accent);
+  }
+  .tab-info { min-width: 0; flex: 1; }
+  .tab-title {
+    font-weight: 500; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tab-url {
+    color: var(--text3); font-size: 12px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .tab-url a { color: var(--accent); text-decoration: none; }
+  .tab-url a:hover { text-decoration: underline; }
+
+  /* Drop zone */
+  .drop-zone {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; flex: 1; padding: 60px 20px; text-align: center;
+  }
+  .drop-zone.drag-over { background: var(--selected-bg); }
+  .drop-zone svg { width: 64px; height: 64px; color: var(--text3); margin-bottom: 16px; }
+  .drop-zone h2 { font-size: 20px; margin-bottom: 8px; }
+  .drop-zone p { color: var(--text2); margin-bottom: 20px; font-size: 14px; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #323232; color: #fff; padding: 10px 20px; border-radius: 8px;
+    font-size: 14px; z-index: 100; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Empty state in export */
+  .empty-export {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; color: var(--text3);
+    font-size: 13px; text-align: center; padding: 20px;
+  }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .main { flex-direction: column; }
+    .panel-right { width: 100%; height: 50vh; border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Chrome Tab Group Browser</h1>
+  <div class="spacer"></div>
+  <div class="search-box">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Filter groups or URLs..." />
+  </div>
+  <label class="btn" id="loadBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Load JSON
+    <input type="file" id="fileInput" accept=".json" style="display:none" />
+  </label>
+</header>
+
+<div class="toolbar" id="toolbar" style="display:none">
+  <span class="stat"><strong id="profileCount">0</strong> profiles</span>
+  <span class="stat"><strong id="groupCount">0</strong> groups</span>
+  <span class="stat"><strong id="tabCount">0</strong> tabs</span>
+  <span style="flex:1"></span>
+  <button class="btn" id="selectAllBtn">Select All</button>
+  <button class="btn" id="deselectAllBtn">Deselect All</button>
+</div>
+
+<div class="main">
+  <!-- Left panel: groups tree or drop zone -->
+  <div class="panel-left" id="panelLeft">
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg>
+      <h2>Load Recovery Data</h2>
+      <p>Drag &amp; drop a JSON file here, or use the Load JSON button above.<br>
+      Generate JSON with: <code>python3 chrome_tab_group_recovery.py --json</code></p>
+      <label class="btn primary" style="cursor:pointer">
+        Choose File
+        <input type="file" accept=".json" style="display:none" class="file-trigger" />
+      </label>
+    </div>
+    <div id="groupTree" style="display:none"></div>
+  </div>
+
+  <!-- Right panel: export -->
+  <div class="panel-right">
+    <div class="panel-right-header">
+      <h2>Export URLs</h2>
+      <span class="stat" id="selectedCount">0 selected</span>
+    </div>
+    <div class="export-area" id="exportArea">
+      <div class="empty-export" id="emptyExport">
+        Select tab groups or individual tabs<br>to see their URLs here
+      </div>
+      <pre id="exportText" style="display:none"></pre>
+    </div>
+    <div class="export-actions">
+      <button class="btn primary" id="copyBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy to Clipboard
+      </button>
+      <button class="btn" id="downloadBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download .txt
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ── State ──
+  let data = [];           // raw JSON array from tool
+  let structured = [];     // [{profile, email, groups: [{title, color, tabs: [{url, title, selected}], selected}]}]
+  let filterText = "";
+
+  // ── DOM refs ──
+  const $ = id => document.getElementById(id);
+  const dropZone = $("dropZone");
+  const groupTree = $("groupTree");
+  const searchInput = $("searchInput");
+  const toolbar = $("toolbar");
+  const exportText = $("exportText");
+  const emptyExport = $("emptyExport");
+  const toast = $("toast");
+
+  // ── Color map matching Chrome's palette ──
+  const colorMap = {
+    grey: "var(--group-grey)", blue: "var(--group-blue)", red: "var(--group-red)",
+    yellow: "var(--group-yellow)", green: "var(--group-green)", pink: "var(--group-pink)",
+    purple: "var(--group-purple)", cyan: "var(--group-cyan)", orange: "var(--group-orange)"
+  };
+
+  // ── Load data ──
+  function loadJSON(raw) {
+    try {
+      data = JSON.parse(raw);
+      if (!Array.isArray(data)) throw new Error("Expected JSON array");
+      structureData();
+      render();
+    } catch (e) {
+      showToast("Invalid JSON: " + e.message);
+    }
+  }
+
+  function structureData() {
+    // Deduplicate by group UUID, keeping version with most tabs
+    const best = new Map(); // key: profile+uuid -> entry
+    for (const entry of data) {
+      const key = entry.profile + "|" + (entry.group_uuid || entry.group_title);
+      const existing = best.get(key);
+      if (!existing || entry.tab_count > existing.tab_count) {
+        best.set(key, entry);
+      }
+    }
+
+    // Group by profile
+    const profileMap = new Map();
+    for (const entry of best.values()) {
+      const pKey = entry.profile;
+      if (!profileMap.has(pKey)) {
+        profileMap.set(pKey, {
+          profile: entry.profile_name || entry.profile,
+          email: entry.profile_email || "",
+          groups: []
+        });
+      }
+      const color = (entry.group_color || "grey").replace(/id=\d+/, "grey");
+      profileMap.get(pKey).groups.push({
+        title: entry.group_title || "(untitled)",
+        color: colorMap[color] || colorMap.grey,
+        colorName: color,
+        uuid: entry.group_uuid || "",
+        collapsed: entry.group_collapsed || false,
+        selected: false,
+        expanded: true,
+        tabs: (entry.tabs || []).map(t => ({
+          url: t.url, title: t.title || "", selected: false
+        }))
+      });
+    }
+
+    // Sort groups alphabetically within each profile
+    for (const p of profileMap.values()) {
+      p.groups.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    structured = Array.from(profileMap.values());
+  }
+
+  // ── Render ──
+  function render() {
+    if (!structured.length) return;
+
+    dropZone.style.display = "none";
+    groupTree.style.display = "block";
+    toolbar.style.display = "flex";
+
+    let totalGroups = 0, totalTabs = 0;
+    structured.forEach(p => {
+      totalGroups += p.groups.length;
+      p.groups.forEach(g => totalTabs += g.tabs.length);
+    });
+    $("profileCount").textContent = structured.length;
+    $("groupCount").textContent = totalGroups;
+    $("tabCount").textContent = totalTabs;
+
+    groupTree.innerHTML = "";
+    for (let pi = 0; pi < structured.length; pi++) {
+      const p = structured[pi];
+      groupTree.appendChild(renderProfile(p, pi));
+    }
+    updateExport();
+  }
+
+  function renderProfile(p, pi) {
+    const section = el("div", "profile-section");
+
+    // Count visible groups after filter
+    const visibleGroups = p.groups.filter(g => matchesFilter(g));
+    if (filterText && visibleGroups.length === 0) {
+      section.style.display = "none";
+      return section;
+    }
+
+    const header = el("div", "profile-header");
+    header.innerHTML = `
+      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="name">${esc(p.profile)}</span>
+      <span class="email">${esc(p.email)}</span>
+      <span class="count">${visibleGroups.length} groups</span>
+    `;
+
+    const body = el("div", "profile-body");
+    for (let gi = 0; gi < p.groups.length; gi++) {
+      const g = p.groups[gi];
+      if (filterText && !matchesFilter(g)) continue;
+      body.appendChild(renderGroup(g, pi, gi));
+    }
+
+    header.onclick = () => {
+      const arrow = header.querySelector(".arrow");
+      arrow.classList.toggle("collapsed");
+      body.classList.toggle("hidden");
+    };
+
+    section.appendChild(header);
+    section.appendChild(body);
+    return section;
+  }
+
+  function renderGroup(g, pi, gi) {
+    const card = el("div", "group-card");
+
+    const header = el("div", "group-header");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = g.selected;
+    cb.onclick = (e) => { e.stopPropagation(); toggleGroup(pi, gi, cb.checked); };
+
+    const badge = el("span", "group-color-badge");
+    badge.style.background = g.color;
+
+    const titleSpan = el("span", "title");
+    titleSpan.textContent = g.title;
+
+    const meta = el("span", "meta");
+    meta.innerHTML = `<span>${g.tabs.length} tab${g.tabs.length !== 1 ? "s" : ""}</span>`;
+
+    const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    arrow.setAttribute("class", "arrow" + (g.expanded ? "" : " collapsed"));
+    arrow.setAttribute("viewBox", "0 0 24 24");
+    arrow.setAttribute("fill", "none");
+    arrow.setAttribute("stroke", "currentColor");
+    arrow.setAttribute("stroke-width", "2");
+    arrow.innerHTML = '<polyline points="6 9 12 15 18 9"/>';
+
+    header.appendChild(cb);
+    header.appendChild(badge);
+    header.appendChild(titleSpan);
+    header.appendChild(meta);
+    header.appendChild(arrow);
+
+    header.onclick = (e) => {
+      if (e.target === cb) return;
+      g.expanded = !g.expanded;
+      arrow.setAttribute("class", "arrow" + (g.expanded ? "" : " collapsed"));
+      tabsDiv.classList.toggle("hidden", !g.expanded);
+    };
+
+    const tabsDiv = el("div", "group-tabs" + (g.expanded ? "" : " hidden"));
+    for (let ti = 0; ti < g.tabs.length; ti++) {
+      const t = g.tabs[ti];
+      if (filterText && !tabMatchesFilter(t, g)) continue;
+      tabsDiv.appendChild(renderTab(t, pi, gi, ti));
+    }
+
+    card.appendChild(header);
+    card.appendChild(tabsDiv);
+    return card;
+  }
+
+  function renderTab(t, pi, gi, ti) {
+    const row = el("div", "tab-row" + (t.selected ? " selected" : ""));
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = t.selected;
+    cb.onchange = () => { toggleTab(pi, gi, ti, cb.checked); };
+
+    const info = el("div", "tab-info");
+    if (t.title) {
+      const titleDiv = el("div", "tab-title");
+      titleDiv.textContent = t.title;
+      info.appendChild(titleDiv);
+    }
+    const urlDiv = el("div", "tab-url");
+    const a = document.createElement("a");
+    a.href = t.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = t.url;
+    urlDiv.appendChild(a);
+    info.appendChild(urlDiv);
+
+    row.appendChild(cb);
+    row.appendChild(info);
+    return row;
+  }
+
+  // ── Selection logic ──
+  function toggleGroup(pi, gi, checked) {
+    const g = structured[pi].groups[gi];
+    g.selected = checked;
+    g.tabs.forEach(t => t.selected = checked);
+    render();
+  }
+
+  function toggleTab(pi, gi, ti, checked) {
+    const g = structured[pi].groups[gi];
+    g.tabs[ti].selected = checked;
+    g.selected = g.tabs.every(t => t.selected);
+    render();
+  }
+
+  function selectAll() {
+    structured.forEach(p => p.groups.forEach(g => {
+      if (filterText && !matchesFilter(g)) return;
+      g.selected = true;
+      g.tabs.forEach(t => {
+        if (!filterText || tabMatchesFilter(t, g)) t.selected = true;
+      });
+    }));
+    render();
+  }
+
+  function deselectAll() {
+    structured.forEach(p => p.groups.forEach(g => {
+      g.selected = false;
+      g.tabs.forEach(t => t.selected = false);
+    }));
+    render();
+  }
+
+  // ── Filter ──
+  function matchesFilter(g) {
+    if (!filterText) return true;
+    const q = filterText.toLowerCase();
+    if (g.title.toLowerCase().includes(q)) return true;
+    return g.tabs.some(t =>
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      t.url.toLowerCase().includes(q)
+    );
+  }
+
+  function tabMatchesFilter(t, g) {
+    if (!filterText) return true;
+    const q = filterText.toLowerCase();
+    if (g.title.toLowerCase().includes(q)) return true;
+    return (t.title && t.title.toLowerCase().includes(q)) ||
+           t.url.toLowerCase().includes(q);
+  }
+
+  // ── Export ──
+  function updateExport() {
+    const urls = [];
+    structured.forEach(p => p.groups.forEach(g =>
+      g.tabs.forEach(t => { if (t.selected) urls.push(t.url); })
+    ));
+
+    $("selectedCount").textContent = urls.length + " selected";
+    $("copyBtn").disabled = urls.length === 0;
+    $("downloadBtn").disabled = urls.length === 0;
+
+    if (urls.length === 0) {
+      emptyExport.style.display = "flex";
+      exportText.style.display = "none";
+    } else {
+      emptyExport.style.display = "none";
+      exportText.style.display = "block";
+      exportText.textContent = urls.join("\n");
+    }
+  }
+
+  function copyToClipboard() {
+    const text = exportText.textContent;
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      showToast("Copied " + text.split("\n").length + " URLs to clipboard");
+    }).catch(() => {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      showToast("Copied to clipboard");
+    });
+  }
+
+  function downloadTxt() {
+    const text = exportText.textContent;
+    if (!text) return;
+    const blob = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "tab_group_urls.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("Downloaded tab_group_urls.txt");
+  }
+
+  // ── Helpers ──
+  function el(tag, cls) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    return e;
+  }
+  function esc(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2500);
+  }
+
+  // ── File loading ──
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => loadJSON(e.target.result);
+    reader.readAsText(file);
+  }
+
+  $("fileInput").onchange = (e) => handleFile(e.target.files[0]);
+  document.querySelectorAll(".file-trigger").forEach(el => {
+    el.onchange = (e) => handleFile(e.target.files[0]);
+  });
+
+  // Drag and drop
+  document.body.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+  document.body.addEventListener("dragleave", () => {
+    dropZone.classList.remove("drag-over");
+  });
+  document.body.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".json")) handleFile(file);
+    else showToast("Please drop a .json file");
+  });
+
+  // Search
+  searchInput.oninput = () => {
+    filterText = searchInput.value.trim();
+    render();
+  };
+
+  // Toolbar buttons
+  $("selectAllBtn").onclick = selectAll;
+  $("deselectAllBtn").onclick = deselectAll;
+  $("copyBtn").onclick = copyToClipboard;
+  $("downloadBtn").onclick = downloadTxt;
+
+  // ── Check for embedded data (from --ui flag) ──
+  if (typeof EMBEDDED_DATA !== "undefined" && EMBEDDED_DATA) {
+    loadJSON(JSON.stringify(EMBEDDED_DATA));
+  }
+})();
+</script>
+</body>
+</html>

@@ -19,6 +19,8 @@ import re
 import json
 import sys
 import argparse
+import tempfile
+import webbrowser
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -379,6 +381,66 @@ def format_report(all_data, search=None):
     return "\n".join(lines)
 
 
+def build_json_data(all_data):
+    """Convert scan results into the JSON structure used by --json and --ui."""
+    json_data = []
+    for profile_dir, profile_info, results in all_data:
+        for r in results:
+            for token_hex, group in r["groups"].items():
+                json_data.append(
+                    {
+                        "profile": profile_dir,
+                        "profile_name": profile_info["name"],
+                        "profile_email": profile_info["email"],
+                        "session_file": r["file"],
+                        "group_title": group["title"],
+                        "group_color": group["color"],
+                        "group_uuid": group["uuid"],
+                        "group_collapsed": group["collapsed"],
+                        "tab_count": len(group["tabs"]),
+                        "tabs": [
+                            {"url": t["url"], "title": t["title"]}
+                            for t in group["tabs"]
+                        ],
+                    }
+                )
+    return json_data
+
+
+def launch_ui(json_data):
+    """Generate a self-contained HTML file with embedded data and open it."""
+    # Try to find the companion HTML template
+    html_template = Path(__file__).parent / "chrome_tab_group_browser.html"
+    if html_template.exists():
+        html_content = html_template.read_text(encoding="utf-8")
+    else:
+        print("Error: chrome_tab_group_browser.html not found.", file=sys.stderr)
+        print("Place it next to this script.", file=sys.stderr)
+        sys.exit(1)
+
+    # Inject the data as a JS variable before the closing </script> tag
+    data_script = (
+        f"<script>var EMBEDDED_DATA = {json.dumps(json_data)};</script>\n"
+    )
+    # Insert before the main <script> block
+    html_content = html_content.replace(
+        "<script>",
+        data_script + "<script>",
+        1,
+    )
+
+    # Write to a temp file and open it
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".html", prefix="chrome_tab_groups_", delete=False
+    ) as f:
+        f.write(html_content)
+        tmp_path = f.name
+
+    url = "file://" + tmp_path
+    print(f"Opening browser UI: {url}", file=sys.stderr)
+    webbrowser.open(url)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Recover Chrome tab groups from SNSS session files"
@@ -399,6 +461,11 @@ def main():
         "--json",
         action="store_true",
         help="Output as JSON instead of text",
+    )
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch interactive browser UI with recovery data",
     )
     parser.add_argument(
         "--list-profiles",
@@ -451,29 +518,15 @@ def main():
                     file=sys.stderr,
                 )
 
+    # Build structured JSON data from scan results
+    json_data = build_json_data(all_data)
+
+    # --ui mode: launch browser
+    if args.ui:
+        launch_ui(json_data)
+        return
+
     if args.json:
-        # JSON output
-        json_data = []
-        for profile_dir, profile_info, results in all_data:
-            for r in results:
-                for token_hex, group in r["groups"].items():
-                    json_data.append(
-                        {
-                            "profile": profile_dir,
-                            "profile_name": profile_info["name"],
-                            "profile_email": profile_info["email"],
-                            "session_file": r["file"],
-                            "group_title": group["title"],
-                            "group_color": group["color"],
-                            "group_uuid": group["uuid"],
-                            "group_collapsed": group["collapsed"],
-                            "tab_count": len(group["tabs"]),
-                            "tabs": [
-                                {"url": t["url"], "title": t["title"]}
-                                for t in group["tabs"]
-                            ],
-                        }
-                    )
         output = json.dumps(json_data, indent=2)
     else:
         output = format_report(all_data, search=args.search)

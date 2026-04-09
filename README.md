@@ -17,6 +17,7 @@ This tool reads the raw binary files directly, decodes the SNSS commands, and re
 - Deduplicates groups across session files, keeping the most complete version
 - **Search** for specific groups by name
 - **JSON output** for programmatic use
+- **Interactive browser UI** for browsing groups and exporting URLs
 - **Zero dependencies** -- uses only Python standard library
 
 ## Requirements
@@ -89,6 +90,45 @@ python3 chrome_tab_group_recovery.py --json -o my_recovery.json
 python3 chrome_tab_group_recovery.py --profile "Default" --search "work" --json -o work_tabs.json
 ```
 
+## Interactive Browser UI
+
+The tool includes a browser-based UI for visually browsing your recovered tab groups and exporting selected URLs.
+
+### Quick launch
+
+```bash
+python3 chrome_tab_group_recovery.py --ui
+```
+
+This scans all profiles, embeds the results into the HTML viewer, and opens it in your default browser automatically.
+
+### Manual usage
+
+You can also open `chrome_tab_group_browser.html` directly in any browser and load a JSON file:
+
+1. Generate JSON: `python3 chrome_tab_group_recovery.py --json -o data.json`
+2. Open `chrome_tab_group_browser.html` in your browser
+3. Click **Load JSON** or drag-and-drop the JSON file onto the page
+
+### UI Features
+
+- **Profile/Group/Tab tree** -- collapsible hierarchy with color-coded group badges
+- **Checkboxes** -- select entire groups (checks all member tabs) or individual tabs
+- **Search filter** -- real-time filter across group names, tab titles, and URLs
+- **Export panel** -- shows selected URLs in plain text, one per line
+- **Copy to Clipboard** -- copies selected URLs, ready to paste into Bulk URL Opener or similar tools
+- **Download .txt** -- saves selected URLs as a text file
+- **Select All / Deselect All** -- bulk selection controls
+- **Dark mode** -- automatically follows your system preference
+
+### Workflow: Restoring Tab Groups with Bulk URL Opener
+
+1. Run `python3 chrome_tab_group_recovery.py --ui`
+2. Find the group you want to restore and check its checkbox
+3. Click **Copy to Clipboard**
+4. Open the [Bulk URL Opener](https://chromewebstore.google.com/detail/bulk-url-opener/kgnfciolbjojfdgnkjlklkmelpakgnii) extension in Chrome
+5. Paste the URLs and click Open
+
 ## Example Output
 
 ```
@@ -121,7 +161,8 @@ PROFILE: "Personal"
 
 ```
 usage: chrome_tab_group_recovery.py [-h] [--profile PROFILE] [--search SEARCH]
-                                     [--output OUTPUT] [--json] [--list-profiles]
+                                     [--output OUTPUT] [--json] [--ui]
+                                     [--list-profiles]
 
 Recover Chrome tab groups from SNSS session files
 
@@ -133,6 +174,7 @@ options:
   --output OUTPUT, -o OUTPUT
                         Output file path (default: stdout + auto-save)
   --json                Output as JSON instead of text
+  --ui                  Launch interactive browser UI with recovery data
   --list-profiles       Just list available profiles and exit
 ```
 
