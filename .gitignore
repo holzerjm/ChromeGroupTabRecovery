@@ -1,0 +1,27 @@
+# Recovery output files (contain personal data)
+recovered_tab_groups*.txt
+recovered_tab_groups*.json
+*.txt
+!README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Claude Code
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
