@@ -1,5 +1,9 @@
 # Chrome Tab Group Recovery
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Made with Python](https://img.shields.io/badge/made%20with-Python-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![Chrome](https://img.shields.io/badge/Chrome-SNSS-4285F4?logo=googlechrome&logoColor=white)](chrome_tab_group_browser.html)
+
 A Python tool that decodes Google Chrome's binary SNSS session files to recover lost or deleted tab groups, including group names, colors, collapsed state, and all member tab URLs with page titles.
 
 ## The Problem
